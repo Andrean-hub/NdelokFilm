@@ -1,17 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../services/auth_services.dart';
+import 'login_page.dart';
 
 void main() {
   runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  Future<Widget> _getInitialPage() async {
+    final token = await getToken();
+    return token != null ? HomePage() : LoginPage();
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: HomePage(),
+      title: 'Flutter Authentication',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      home: FutureBuilder<Widget>(
+        future: _getInitialPage(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          }
+          return snapshot.data!;
+        },
+      ),
+      routes: {
+        '/login': (context) => LoginPage(),
+        '/home': (context) => HomePage(),
+      },
     );
   }
 }
@@ -33,6 +55,26 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     fetchMovies();
+  }
+
+  Future<void> fetchProtectedData() async {
+    final token = await getToken();
+
+    final response = await http.get(
+      Uri.parse(
+          'http://10.90.35.53/testapi/protected-endpoint'), // Ganti dengan URL endpoint yang dilindungi
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization':
+            'Bearer $token', // Tambahkan token di header Authorization
+      },
+    );
+
+    if (response.statusCode == 200) {
+      print('Data dari API yang dilindungi: ${response.body}');
+    } else {
+      print('Gagal mendapatkan data: ${response.body}');
+    }
   }
 
   Future<void> fetchMovies() async {
@@ -89,7 +131,20 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Ndelok Film'),
+        title: Text('IMDb',
+        style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,),),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.logout),
+            onPressed: () async {
+              await removeToken(); // Hapus token dari SharedPreferences
+              Navigator.pushReplacementNamed(
+                  context, '/login'); // Kembali ke halaman login
+            },
+          )
+        ],
         backgroundColor: Colors.blue,
         elevation: 10,
         shadowColor: Colors.blueGrey,
